@@ -96,10 +96,11 @@ async def generate(request: Request, body: GenerateRequest):
         logger.close()
         return {"reply": reply}
     except Exception as e:
+        tb = traceback.format_exc()
         logger.error(
-            f"Unhandled error: {e}\n{traceback.format_exc()}",
+            f"Unhandled error: {e}\n{tb}",
             layer="main", event="unhandled_error",
-            data={"error": str(e), "traceback": traceback.format_exc()},
+            data={"error": str(e), "traceback": tb},
         )
         logger.close(error=True)
         return {"reply": "I encountered an error with the local model service."}
