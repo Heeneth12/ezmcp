@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(python -c \"from config import SERVER_URL, ITEMS_BASE_URL, CHAT_BASE_URL, TIMEOUT; print\\(SERVER_URL, ITEMS_BASE_URL, CHAT_BASE_URL, TIMEOUT\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -m pytest tests/test_item_service.py -v)",
+      "Bash(python -m pytest tests/test_item_tools.py -v)",
+      "Bash(python -m pytest tests/test_tool_registry.py -v)",
+      "Bash(python -m pytest tests/test_health.py tests/test_generate.py -v)",
+      "Bash(python -m pytest -v)"
+    ]
+  }
+}
