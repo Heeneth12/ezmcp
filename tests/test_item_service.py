@@ -2,14 +2,6 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-@pytest.fixture
-def mock_logger():
-    logger = MagicMock()
-    logger.debug = MagicMock()
-    logger.error = MagicMock()
-    return logger
-
-
 @pytest.mark.asyncio
 async def test_get_all_items_posts_to_correct_url(mock_logger):
     mock_response = MagicMock()

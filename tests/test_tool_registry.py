@@ -2,15 +2,6 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-@pytest.fixture
-def mock_logger():
-    logger = MagicMock()
-    logger.debug = MagicMock()
-    logger.error = MagicMock()
-    logger.section = MagicMock()
-    return logger
-
-
 def test_get_tool_schemas_returns_list_of_functions():
     from ai.tool_registry import get_tool_schemas
     schemas = get_tool_schemas()

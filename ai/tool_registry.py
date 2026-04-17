@@ -1,7 +1,6 @@
 import json
 from ollama import AsyncClient as OllamaAsyncClient
 from modules.items.item_tools import ITEM_TOOLS
-from logger import RequestLogger
 
 ALL_TOOLS = [
     *ITEM_TOOLS,
@@ -25,7 +24,7 @@ def get_tool_schemas() -> list:
     ]
 
 
-async def execute_tool(name: str, args: dict, token: str, logger: RequestLogger) -> str:
+async def execute_tool(name: str, args: dict, token: str, logger) -> str:
     tool = next((t for t in ALL_TOOLS if t["name"] == name), None)
     if not tool:
         logger.error(f"Tool '{name}' not found", layer="tool", event="tool_not_found", data={"name": name})
@@ -40,7 +39,7 @@ async def execute_tool(name: str, args: dict, token: str, logger: RequestLogger)
     return result
 
 
-async def run_agent_loop(messages: list, token: str, logger: RequestLogger) -> str:
+async def run_agent_loop(messages: list, token: str, logger) -> str:
     client = OllamaAsyncClient()
     tool_schemas = get_tool_schemas()
 

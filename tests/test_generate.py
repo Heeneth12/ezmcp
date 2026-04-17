@@ -4,16 +4,6 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def mock_logger():
-    logger = MagicMock()
-    logger.debug = MagicMock()
-    logger.info = MagicMock()
-    logger.error = MagicMock()
-    logger.close = MagicMock()
-    return logger
-
-
-@pytest.fixture
 def client(mock_logger):
     with patch("main.RequestLogger", return_value=mock_logger), \
          patch("main.run_agent_loop", new_callable=AsyncMock) as mock_loop, \

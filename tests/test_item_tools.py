@@ -2,14 +2,6 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-@pytest.fixture
-def mock_logger():
-    logger = MagicMock()
-    logger.debug = MagicMock()
-    logger.error = MagicMock()
-    return logger
-
-
 def test_item_tools_has_six_tools():
     from modules.items.item_tools import ITEM_TOOLS
     assert len(ITEM_TOOLS) == 6
