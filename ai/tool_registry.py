@@ -1,6 +1,7 @@
 import json
 from ollama import AsyncClient as OllamaAsyncClient
 from modules.items.item_tools import ITEM_TOOLS
+from logger import RequestLogger
 
 ALL_TOOLS = [
     *ITEM_TOOLS,
@@ -24,18 +25,22 @@ def get_tool_schemas() -> list:
     ]
 
 
-async def execute_tool(name: str, args: dict, token: str, logger) -> str:
+async def execute_tool(name: str, args: dict, token: str, logger: RequestLogger) -> str:
     tool = next((t for t in ALL_TOOLS if t["name"] == name), None)
     if not tool:
         logger.error(f"Tool '{name}' not found", layer="tool", event="tool_not_found", data={"name": name})
         return f"Tool '{name}' not found"
     logger.debug(f"Executing: {name}", layer="tool", event="tool_execute_start", data={"name": name, "args": dict(args)})
-    result = await tool["execute"](args, token, logger)
+    try:
+        result = await tool["execute"](args, token, logger)
+    except Exception as e:
+        logger.error(f"Tool '{name}' raised an exception: {e}", layer="tool", event="tool_execute_error", data={"name": name, "error": str(e)})
+        return f"Tool '{name}' encountered an error: {str(e)}"
     logger.debug(f"Result: {str(result)[:200]}", layer="tool", event="tool_execute_done", data={"name": name, "result_preview": str(result)[:200]})
     return result
 
 
-async def run_agent_loop(messages: list, token: str, logger) -> str:
+async def run_agent_loop(messages: list, token: str, logger: RequestLogger) -> str:
     client = OllamaAsyncClient()
     tool_schemas = get_tool_schemas()
 
