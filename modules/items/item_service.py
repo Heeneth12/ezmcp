@@ -50,7 +50,7 @@ async def update_item(item_id: int, updates: dict, token: str, logger) -> dict:
 async def toggle_item_status(item_id: int, is_active: bool, token: str, logger) -> dict:
     active_str = "true" if is_active else "false"
     url = f"{ITEMS_BASE_URL}/{item_id}/status?active={active_str}"
-    logger.debug(f"POST {url}", layer="http", event="http_request", data={"method": "POST", "url": url})
+    logger.debug(f"POST {url}", layer="http", event="http_request", data={"method": "POST", "url": url, "payload": {}})
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(url, json={}, headers={"Authorization": f"Bearer {token}"})
         response.raise_for_status()
