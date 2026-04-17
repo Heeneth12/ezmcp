@@ -1,5 +1,13 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+@pytest.fixture
+def mock_logger():
+    logger = MagicMock()
+    logger.debug = MagicMock()
+    logger.error = MagicMock()
+    return logger
 
 
 def test_item_tools_has_six_tools():
@@ -30,42 +38,42 @@ def test_tool_names_are_correct():
     ]
 
 
-async def test_get_all_items_execute_calls_service():
+async def test_get_all_items_execute_calls_service(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "get_all_items")
 
     with patch("modules.items.item_tools.get_all_items", new_callable=AsyncMock) as mock_svc:
         mock_svc.return_value = {"data": []}
-        result = await tool["execute"]({"page": 0, "size": 10, "active": True}, "tok")
+        result = await tool["execute"]({"page": 0, "size": 10, "active": True}, "tok", mock_logger)
 
-    mock_svc.assert_called_once_with(0, 10, {"active": True}, "tok")
+    mock_svc.assert_called_once_with(0, 10, {"active": True}, "tok", mock_logger)
     assert "data" in result
 
 
-async def test_get_all_items_execute_handles_error():
+async def test_get_all_items_execute_handles_error(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "get_all_items")
 
     with patch("modules.items.item_tools.get_all_items", new_callable=AsyncMock) as mock_svc:
         mock_svc.side_effect = Exception("Connection refused")
-        result = await tool["execute"]({}, "tok")
+        result = await tool["execute"]({}, "tok", mock_logger)
 
     assert "Error" in result
 
 
-async def test_search_items_execute_calls_service():
+async def test_search_items_execute_calls_service(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "search_items")
 
     with patch("modules.items.item_tools.search_items", new_callable=AsyncMock) as mock_svc:
         mock_svc.return_value = {"data": [{"name": "Cable"}]}
-        result = await tool["execute"]({"query": "Cable"}, "tok")
+        result = await tool["execute"]({"query": "Cable"}, "tok", mock_logger)
 
-    mock_svc.assert_called_once_with({"searchQuery": "Cable"}, "tok")
+    mock_svc.assert_called_once_with({"searchQuery": "Cable"}, "tok", mock_logger)
     assert "Cable" in result
 
 
-async def test_add_item_generates_code_when_missing():
+async def test_add_item_generates_code_when_missing(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "add_item")
 
@@ -74,7 +82,8 @@ async def test_add_item_generates_code_when_missing():
         result = await tool["execute"](
             {"name": "Widget", "category": "General", "unitOfMeasure": "PCS",
              "purchasePrice": 5.0, "sellingPrice": 10.0},
-            "tok"
+            "tok",
+            mock_logger,
         )
 
     call_payload = mock_svc.call_args[0][0]
@@ -82,36 +91,36 @@ async def test_add_item_generates_code_when_missing():
     assert "Success" in result
 
 
-async def test_edit_item_execute_calls_service():
+async def test_edit_item_execute_calls_service(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "edit_item")
 
     with patch("modules.items.item_tools.update_item", new_callable=AsyncMock) as mock_svc:
         mock_svc.return_value = {}
-        result = await tool["execute"]({"id": 7, "name": "Updated"}, "tok")
+        result = await tool["execute"]({"id": 7, "name": "Updated"}, "tok", mock_logger)
 
-    mock_svc.assert_called_once_with(7, {"name": "Updated"}, "tok")
+    mock_svc.assert_called_once_with(7, {"name": "Updated"}, "tok", mock_logger)
     assert "7" in result
 
 
-async def test_toggle_item_status_execute_calls_service():
+async def test_toggle_item_status_execute_calls_service(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "toggle_item_status")
 
     with patch("modules.items.item_tools.toggle_item_status_svc", new_callable=AsyncMock) as mock_svc:
         mock_svc.return_value = {}
-        result = await tool["execute"]({"id": 3, "active": False}, "tok")
+        result = await tool["execute"]({"id": 3, "active": False}, "tok", mock_logger)
 
-    mock_svc.assert_called_once_with(3, False, "tok")
+    mock_svc.assert_called_once_with(3, False, "tok", mock_logger)
     assert "Inactive" in result
 
 
-async def test_get_bulk_template_execute_returns_url():
+async def test_get_bulk_template_execute_returns_url(mock_logger):
     from modules.items.item_tools import ITEM_TOOLS
     tool = next(t for t in ITEM_TOOLS if t["name"] == "get_bulk_template")
 
     with patch("modules.items.item_tools.get_template_url") as mock_url:
         mock_url.return_value = "http://localhost:8080/v1/items/template"
-        result = await tool["execute"]({}, "tok")
+        result = await tool["execute"]({}, "tok", mock_logger)
 
     assert "http://localhost:8080/v1/items/template" in result

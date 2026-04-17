@@ -9,7 +9,7 @@ from modules.items.item_service import (
 )
 
 
-async def _execute_get_all_items(args: dict, token: str) -> str:
+async def _execute_get_all_items(args: dict, token: str, logger) -> str:
     try:
         filter_data = {
             k: v for k, v in {
@@ -19,54 +19,52 @@ async def _execute_get_all_items(args: dict, token: str) -> str:
                 "active": args.get("active", True),
             }.items() if v is not None
         }
-        data = await get_all_items(args.get("page", 0), args.get("size", 10), filter_data, token)
-        print("get_all_items", data)
+        data = await get_all_items(args.get("page", 0), args.get("size", 10), filter_data, token, logger)
         return str(data)
     except Exception as e:
         return f"Error fetching items: {str(e)}"
 
 
-async def _execute_search_items(args: dict, token: str) -> str:
+async def _execute_search_items(args: dict, token: str, logger) -> str:
     try:
-        data = await search_items({"searchQuery": args["query"]}, token)
-        print("search_items", data)
+        data = await search_items({"searchQuery": args["query"]}, token, logger)
         return str(data)
     except Exception as e:
         return f"Search failed: {str(e)}"
 
 
-async def _execute_add_item(args: dict, token: str) -> str:
+async def _execute_add_item(args: dict, token: str, logger) -> str:
     try:
         item_code = args.get("itemCode") or f"ITM-{random.randint(1000, 9999)}"
         payload = {**args, "itemCode": item_code, "isActive": True}
-        await create_item(payload, token)
+        await create_item(payload, token, logger)
         return f"Success! Created Item '{args['name']}' with Code: {item_code}."
     except Exception as e:
         return f"Failed to create item. Reason: {str(e)}"
 
 
-async def _execute_edit_item(args: dict, token: str) -> str:
+async def _execute_edit_item(args: dict, token: str, logger) -> str:
     try:
         item_id = args.pop("id")
-        await update_item(item_id, args, token)
+        await update_item(item_id, args, token, logger)
         return f"Successfully updated details for Item ID {item_id}."
     except Exception as e:
         return f"Update failed: {str(e)}"
 
 
-async def _execute_toggle_status(args: dict, token: str) -> str:
+async def _execute_toggle_status(args: dict, token: str, logger) -> str:
     try:
-        await toggle_item_status_svc(args["id"], args["active"], token)
+        await toggle_item_status_svc(args["id"], args["active"], token, logger)
         state = "Active" if args["active"] else "Inactive"
         return f"Item {args['id']} is now {state}."
     except Exception as e:
         return f"Status change failed: {str(e)}"
 
 
-async def _execute_get_bulk_template(args: dict, token: str) -> str:
+async def _execute_get_bulk_template(args: dict, token: str, logger) -> str:
     try:
         url = get_template_url()
-        print("get_bulk_template", url)
+        logger.debug(f"Template URL: {url}", layer="tool", event="template_url", data={"url": url})
         return f"You can download the template here: {url}"
     except Exception as e:
         return f"Error getting template: {str(e)}"
