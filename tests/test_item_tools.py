@@ -124,3 +124,4 @@ async def test_get_bulk_template_execute_returns_url(mock_logger):
         result = await tool["execute"]({}, "tok", mock_logger)
 
     assert "http://localhost:8080/v1/items/template" in result
+    mock_logger.debug.assert_called_once()

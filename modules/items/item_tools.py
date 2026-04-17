@@ -45,8 +45,9 @@ async def _execute_add_item(args: dict, token: str, logger) -> str:
 
 async def _execute_edit_item(args: dict, token: str, logger) -> str:
     try:
-        item_id = args.pop("id")
-        await update_item(item_id, args, token, logger)
+        item_id = args["id"]
+        updates = {k: v for k, v in args.items() if k != "id"}
+        await update_item(item_id, updates, token, logger)
         return f"Successfully updated details for Item ID {item_id}."
     except Exception as e:
         return f"Update failed: {str(e)}"
