@@ -2,6 +2,15 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
+@pytest.fixture
+def mock_logger():
+    logger = MagicMock()
+    logger.debug = MagicMock()
+    logger.error = MagicMock()
+    logger.section = MagicMock()
+    return logger
+
+
 def test_get_tool_schemas_returns_list_of_functions():
     from ai.tool_registry import get_tool_schemas
     schemas = get_tool_schemas()
@@ -27,24 +36,38 @@ def test_get_tool_schemas_has_all_item_tools():
     assert "get_bulk_template" in names
 
 
-async def test_execute_tool_routes_to_correct_tool():
+async def test_execute_tool_routes_to_correct_tool(mock_logger):
     from ai.tool_registry import execute_tool
 
     with patch("modules.items.item_tools.search_items", new_callable=AsyncMock) as mock_svc:
         mock_svc.return_value = {"data": [{"name": "Cable"}]}
-        result = await execute_tool("search_items", {"query": "Cable"}, "tok")
+        result = await execute_tool("search_items", {"query": "Cable"}, "tok", mock_logger)
 
-    mock_svc.assert_called_once_with({"searchQuery": "Cable"}, "tok")
+    mock_svc.assert_called_once_with({"searchQuery": "Cable"}, "tok", mock_logger)
     assert "Cable" in result
 
 
-async def test_execute_tool_unknown_name_returns_error():
+async def test_execute_tool_unknown_name_returns_error(mock_logger):
     from ai.tool_registry import execute_tool
-    result = await execute_tool("nonexistent_tool", {}, "tok")
+    result = await execute_tool("nonexistent_tool", {}, "tok", mock_logger)
     assert "not found" in result
+    mock_logger.error.assert_called_once()
 
 
-async def test_run_agent_loop_returns_reply_when_no_tool_calls():
+async def test_execute_tool_logs_start_and_result(mock_logger):
+    from ai.tool_registry import execute_tool
+
+    with patch("modules.items.item_tools.get_template_url") as mock_url:
+        mock_url.return_value = "http://example.com/template"
+        await execute_tool("get_bulk_template", {}, "tok", mock_logger)
+
+    assert mock_logger.debug.call_count >= 2
+    first_call_kwargs = mock_logger.debug.call_args_list[0][1]
+    assert first_call_kwargs["layer"] == "tool"
+    assert first_call_kwargs["event"] == "tool_execute_start"
+
+
+async def test_run_agent_loop_returns_reply_when_no_tool_calls(mock_logger):
     from ai.tool_registry import run_agent_loop
 
     mock_message = MagicMock()
@@ -58,13 +81,14 @@ async def test_run_agent_loop_returns_reply_when_no_tool_calls():
     mock_ollama.chat.return_value = mock_response
 
     with patch("ai.tool_registry.OllamaAsyncClient", return_value=mock_ollama):
-        result = await run_agent_loop([{"role": "user", "content": "show items"}], "tok")
+        result = await run_agent_loop([{"role": "user", "content": "show items"}], "tok", mock_logger)
 
     assert result == "Here are your items."
     assert mock_ollama.chat.call_count == 1
+    mock_logger.section.assert_called_once_with("OLLAMA ITERATION 1")
 
 
-async def test_run_agent_loop_executes_tool_and_loops():
+async def test_run_agent_loop_executes_tool_and_loops(mock_logger):
     from ai.tool_registry import run_agent_loop
 
     tool_call = MagicMock()
@@ -88,14 +112,14 @@ async def test_run_agent_loop_executes_tool_and_loops():
     with patch("ai.tool_registry.OllamaAsyncClient", return_value=mock_ollama), \
          patch("ai.tool_registry.execute_tool", new_callable=AsyncMock) as mock_exec:
         mock_exec.return_value = "http://example.com/template"
-        result = await run_agent_loop([{"role": "user", "content": "give me template"}], "tok")
+        result = await run_agent_loop([{"role": "user", "content": "give me template"}], "tok", mock_logger)
 
     assert mock_ollama.chat.call_count == 2
-    mock_exec.assert_called_once_with("get_bulk_template", {}, "tok")
+    mock_exec.assert_called_once_with("get_bulk_template", {}, "tok", mock_logger)
     assert result == "Download link: http://example.com/template"
 
 
-async def test_run_agent_loop_stops_at_max_iterations():
+async def test_run_agent_loop_stops_at_max_iterations(mock_logger):
     from ai.tool_registry import run_agent_loop, MAX_TOOL_ITERATIONS
 
     tool_call = MagicMock()
@@ -112,7 +136,8 @@ async def test_run_agent_loop_stops_at_max_iterations():
     with patch("ai.tool_registry.OllamaAsyncClient", return_value=mock_ollama), \
          patch("ai.tool_registry.execute_tool", new_callable=AsyncMock) as mock_exec:
         mock_exec.return_value = "data"
-        result = await run_agent_loop([{"role": "user", "content": "loop"}], "tok")
+        result = await run_agent_loop([{"role": "user", "content": "loop"}], "tok", mock_logger)
 
     assert mock_ollama.chat.call_count == MAX_TOOL_ITERATIONS
     assert "maximum" in result.lower()
+    mock_logger.error.assert_called_once()
