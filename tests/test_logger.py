@@ -1,29 +1,30 @@
-import os
 import json
 import pytest
 from unittest.mock import patch
 from logger import RequestLogger
 
 
-def test_request_logger_creates_log_file(tmp_path):
+def test_request_logger_creates_log_file():
     with patch("logger.os.makedirs") as mock_mkdir, \
          patch("logger.logging.FileHandler") as mock_fh, \
-         patch("logger.logging.StreamHandler"):
+         patch("logger.logging.StreamHandler"), \
+         patch("logger.print"):
         mock_fh.return_value.level = 0
         mock_fh.return_value.setFormatter = lambda x: None
         logger = RequestLogger(42, "show me items")
         mock_mkdir.assert_called_once_with("logs", exist_ok=True)
         assert "42" in logger.log_file
-    logger.close()
+        logger.close()
 
 
-def test_request_logger_no_conversation_id(tmp_path):
+def test_request_logger_no_conversation_id():
     with patch("logger.os.makedirs"), \
          patch("logger.logging.FileHandler"), \
-         patch("logger.logging.StreamHandler"):
+         patch("logger.logging.StreamHandler"), \
+         patch("logger.print"):
         logger = RequestLogger(None, "hello")
         assert "no-conv" in logger.log_file
-    logger.close()
+        logger.close()
 
 
 def test_request_logger_debug_calls_underlying_logger():
