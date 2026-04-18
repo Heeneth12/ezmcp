@@ -9,6 +9,7 @@ import httpx
 from config import CHAT_BASE_URL, TIMEOUT
 from ai.tool_registry import run_agent_loop
 from logger import RequestLogger
+from modules.knowledge.ingest import KnowledgeIngester
 
 app = FastAPI(title="EZ MCP AI Worker", version="1.0.0")
 
@@ -30,6 +31,10 @@ class GenerateRequest(BaseModel):
     conversationId: Optional[int] = None
 
 
+class IngestRequest(BaseModel):
+    clear: bool = False
+
+
 async def get_chat_history(conversation_id: Optional[int], token: str, logger: RequestLogger) -> list:
     if not conversation_id:
         logger.debug("No conversationId — skipping history fetch", layer="main", event="history_skip")
@@ -41,7 +46,8 @@ async def get_chat_history(conversation_id: Optional[int], token: str, logger: R
                 f"{CHAT_BASE_URL}/{conversation_id}/messages",
                 headers={"Authorization": f"Bearer {token}"},
             )
-            messages = response.json().get("data", [])
+            #messages = response.json().get("data", [])
+            messages = response.json().get("data", []) or []
             logger.debug(
                 f"Chat history loaded — {len(messages)} messages",
                 layer="main", event="history_fetch_done",
@@ -68,6 +74,21 @@ async def health():
         "model": "phi4-mini",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.post("/v1/admin/ingest")
+async def admin_ingest(body: IngestRequest):
+    import asyncio
+    from pathlib import Path
+    docs_dir = Path(__file__).parent / "docs" / "knowledge"
+    ingester = KnowledgeIngester()
+    try:
+        files, chunks = await asyncio.to_thread(ingester.ingest_all, docs_dir, body.clear)
+        return {"files": files, "chunks": chunks}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @app.post("/v1/ai/generate")
