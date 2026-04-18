@@ -55,3 +55,70 @@ def test_parse_markdown_ignores_h1_headings():
     chunks = ingester.parse_markdown_text(md, source="doc.md", category="business")
     assert len(chunks) == 1
     assert chunks[0].heading == "Section"
+
+
+def _make_ingester_with_mocks(mock_client, mock_collection):
+    with patch("modules.knowledge.ingest.Client", return_value=mock_client), \
+         patch("modules.knowledge.ingest.chromadb") as mock_chroma:
+        mock_chroma.PersistentClient.return_value.get_or_create_collection.return_value = mock_collection
+        return KnowledgeIngester()
+
+
+def test_ingest_all_upserts_correct_chunk_count(tmp_path):
+    (tmp_path / "business").mkdir()
+    (tmp_path / "api").mkdir()
+    (tmp_path / "business" / "items.md").write_text(
+        "## What is an Item?\nAn item is a product.\n\n## Item Types\nPRODUCT or SERVICE.\n"
+    )
+    (tmp_path / "api" / "items-api.md").write_text(
+        "## Get All Items\nPOST /v1/items/all returns paginated items.\n"
+    )
+
+    mock_client = MagicMock()
+    mock_client.embeddings.return_value = MagicMock(embedding=[0.1] * 768)
+    mock_collection = MagicMock()
+    mock_collection.get.return_value = {"ids": []}
+
+    ingester = _make_ingester_with_mocks(mock_client, mock_collection)
+    files, chunks = ingester.ingest_all(tmp_path)
+
+    assert files == 2
+    assert chunks == 3
+    assert mock_collection.upsert.call_count == 3
+
+
+def test_ingest_all_clear_deletes_existing(tmp_path):
+    (tmp_path / "business").mkdir()
+    (tmp_path / "api").mkdir()
+
+    mock_client = MagicMock()
+    mock_client.embeddings.return_value = MagicMock(embedding=[0.1] * 768)
+    mock_collection = MagicMock()
+    mock_collection.get.return_value = {"ids": ["abc", "def"]}
+
+    ingester = _make_ingester_with_mocks(mock_client, mock_collection)
+    ingester.ingest_all(tmp_path, clear=True)
+
+    mock_collection.delete.assert_called_once_with(ids=["abc", "def"])
+
+
+def test_ingest_all_missing_docs_dir_raises(tmp_path):
+    mock_client = MagicMock()
+    mock_collection = MagicMock()
+
+    ingester = _make_ingester_with_mocks(mock_client, mock_collection)
+    with pytest.raises(FileNotFoundError, match="Knowledge directory not found"):
+        ingester.ingest_all(tmp_path / "nonexistent")
+
+
+def test_ingest_file_raises_on_ollama_unavailable(tmp_path):
+    md_file = tmp_path / "test.md"
+    md_file.write_text("## Heading\nSome content.")
+
+    mock_client = MagicMock()
+    mock_client.embeddings.side_effect = Exception("connection refused")
+    mock_collection = MagicMock()
+
+    ingester = _make_ingester_with_mocks(mock_client, mock_collection)
+    with pytest.raises(RuntimeError, match="Ollama not running"):
+        ingester.ingest_file(md_file, "business")

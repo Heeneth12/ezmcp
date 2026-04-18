@@ -45,3 +45,38 @@ class KnowledgeIngester:
                 category=category,
             ))
         return chunks
+
+    def ingest_file(self, filepath: Path, category: str) -> int:
+        text = filepath.read_text(encoding="utf-8")
+        chunks = self.parse_markdown_text(text, source=filepath.name, category=category)
+        for chunk in chunks:
+            try:
+                response = self.client.embeddings(model="nomic-embed-text", prompt=chunk.content)
+                vector = response.embedding
+            except Exception as e:
+                raise RuntimeError("Ollama not running — start it before ingesting") from e
+            self.collection.upsert(
+                ids=[chunk.id],
+                embeddings=[vector],
+                documents=[chunk.content],
+                metadatas=[{"source": chunk.source, "category": chunk.category, "heading": chunk.heading}],
+            )
+        return len(chunks)
+
+    def ingest_all(self, docs_dir: Path, clear: bool = False) -> tuple[int, int]:
+        if not docs_dir.exists():
+            raise FileNotFoundError(f"Knowledge directory not found: {docs_dir}")
+        if clear:
+            existing_ids = self.collection.get()["ids"]
+            if existing_ids:
+                self.collection.delete(ids=existing_ids)
+        total_files = 0
+        total_chunks = 0
+        for category, directory in [("business", docs_dir / "business"), ("api", docs_dir / "api")]:
+            if not directory.exists():
+                continue
+            for md_file in sorted(directory.glob("*.md")):
+                logger.info(f"Ingesting {md_file.name} ({category})")
+                total_chunks += self.ingest_file(md_file, category)
+                total_files += 1
+        return total_files, total_chunks
