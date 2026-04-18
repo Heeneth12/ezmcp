@@ -8,7 +8,19 @@
       "Bash(python -m pytest tests/test_item_tools.py -v)",
       "Bash(python -m pytest tests/test_tool_registry.py -v)",
       "Bash(python -m pytest tests/test_health.py tests/test_generate.py -v)",
-      "Bash(python -m pytest -v)"
+      "Bash(python -m pytest -v)",
+      "Bash(python -m pytest tests/test_logger.py -v)",
+      "Bash(python -m pytest tests/test_logger.py -v --tb=short)",
+      "Bash(git *)",
+      "Bash(python -m pytest tests/test_item_service.py::test_get_all_items_logs_request_and_response -v)",
+      "Bash(python -m pytest tests/test_item_service.py -v --tb=short)",
+      "Bash(python -m pytest tests/test_item_tools.py -v --tb=short)",
+      "Bash(python -m pytest tests/test_item_tools.py::test_edit_item_execute_calls_service -v)",
+      "Bash(python -m pytest tests/test_tool_registry.py -v --tb=short)",
+      "Bash(python -m pytest tests/test_generate.py -v)",
+      "Bash(pip show *)",
+      "Bash(python *)",
+      "Bash(pytest *)"
     ]
   }
 }
