@@ -34,6 +34,7 @@ def test_parse_markdown_ids_are_deterministic():
     chunks_a = ingester.parse_markdown_text(SAMPLE_MD, source="items.md", category="business")
     chunks_b = ingester.parse_markdown_text(SAMPLE_MD, source="items.md", category="business")
     assert chunks_a[0].id == chunks_b[0].id
+    assert chunks_a[0].id != chunks_a[1].id
 
 
 def test_parse_markdown_no_headings_returns_single_chunk(caplog):
@@ -46,3 +47,11 @@ def test_parse_markdown_no_headings_returns_single_chunk(caplog):
     assert chunks[0].heading == "plain.md"
     assert len(caplog.records) == 1
     assert "No headings" in caplog.records[0].message
+
+
+def test_parse_markdown_ignores_h1_headings():
+    ingester = KnowledgeIngester.__new__(KnowledgeIngester)
+    md = "# Doc Title\n\n## Section\ncontent\n"
+    chunks = ingester.parse_markdown_text(md, source="doc.md", category="business")
+    assert len(chunks) == 1
+    assert chunks[0].heading == "Section"

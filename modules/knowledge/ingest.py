@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 class KnowledgeIngester:
     def __init__(self):
-        if chromadb is None:
-            raise ImportError("chromadb not installed")
         self.client = Client()
         self.db = chromadb.PersistentClient(path="./vector_db")
         self.collection = self.db.get_or_create_collection("ez_docs")
@@ -38,7 +36,7 @@ class KnowledgeIngester:
             start = match.start()
             end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
             content = text[start:end].strip()
-            chunk_id = hashlib.md5(f"{source}::{heading}".encode()).hexdigest()
+            chunk_id = hashlib.md5(f"{source}::{start}".encode()).hexdigest()
             chunks.append(KnowledgeChunk(
                 id=chunk_id,
                 heading=heading,
