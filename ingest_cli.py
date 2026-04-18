@@ -21,6 +21,9 @@ def main():
         ingester = KnowledgeIngester()
         files, chunks = ingester.ingest_all(docs_dir, clear=args.clear)
         print(f"Done. Files: {files}, Chunks: {chunks}")
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
     except RuntimeError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)

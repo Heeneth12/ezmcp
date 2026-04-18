@@ -1,4 +1,6 @@
+import asyncio
 import traceback
+from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -46,7 +48,6 @@ async def get_chat_history(conversation_id: Optional[int], token: str, logger: R
                 f"{CHAT_BASE_URL}/{conversation_id}/messages",
                 headers={"Authorization": f"Bearer {token}"},
             )
-            #messages = response.json().get("data", [])
             messages = response.json().get("data", []) or []
             logger.debug(
                 f"Chat history loaded — {len(messages)} messages",
@@ -78,8 +79,6 @@ async def health():
 
 @app.post("/v1/admin/ingest")
 async def admin_ingest(body: IngestRequest):
-    import asyncio
-    from pathlib import Path
     docs_dir = Path(__file__).parent / "docs" / "knowledge"
     ingester = KnowledgeIngester()
     try:
