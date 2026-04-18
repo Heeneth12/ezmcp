@@ -90,6 +90,9 @@ def test_ingest_all_upserts_correct_chunk_count(tmp_path):
 def test_ingest_all_clear_deletes_existing(tmp_path):
     (tmp_path / "business").mkdir()
     (tmp_path / "api").mkdir()
+    (tmp_path / "business" / "items.md").write_text(
+        "## Item Types\nPRODUCT or SERVICE.\n"
+    )
 
     mock_client = MagicMock()
     mock_client.embeddings.return_value = MagicMock(embedding=[0.1] * 768)
@@ -97,9 +100,12 @@ def test_ingest_all_clear_deletes_existing(tmp_path):
     mock_collection.get.return_value = {"ids": ["abc", "def"]}
 
     ingester = _make_ingester_with_mocks(mock_client, mock_collection)
-    ingester.ingest_all(tmp_path, clear=True)
+    files, chunks = ingester.ingest_all(tmp_path, clear=True)
 
     mock_collection.delete.assert_called_once_with(ids=["abc", "def"])
+    assert files == 1
+    assert chunks == 1
+    assert mock_collection.upsert.call_count == 1
 
 
 def test_ingest_all_missing_docs_dir_raises(tmp_path):

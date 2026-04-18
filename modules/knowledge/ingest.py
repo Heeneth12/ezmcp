@@ -31,12 +31,17 @@ class KnowledgeIngester:
             )]
 
         chunks = []
+        heading_count: dict = {}
         for i, match in enumerate(matches):
             heading = match.group(1).strip()
             start = match.start()
             end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
             content = text[start:end].strip()
-            chunk_id = hashlib.md5(f"{source}::{start}".encode()).hexdigest()
+            heading_count[heading] = heading_count.get(heading, 0) + 1
+            suffix = f"::{heading_count[heading] - 1}" if heading_count[heading] > 1 else ""
+            if suffix:
+                logger.warning(f"Duplicate heading '{heading}' in '{source}' — disambiguating with suffix {suffix}")
+            chunk_id = hashlib.md5(f"{source}::{heading}{suffix}".encode()).hexdigest()
             chunks.append(KnowledgeChunk(
                 id=chunk_id,
                 heading=heading,
@@ -55,12 +60,15 @@ class KnowledgeIngester:
                 vector = response.embedding
             except Exception as e:
                 raise RuntimeError("Ollama not running — start it before ingesting") from e
-            self.collection.upsert(
-                ids=[chunk.id],
-                embeddings=[vector],
-                documents=[chunk.content],
-                metadatas=[{"source": chunk.source, "category": chunk.category, "heading": chunk.heading}],
-            )
+            try:
+                self.collection.upsert(
+                    ids=[chunk.id],
+                    embeddings=[vector],
+                    documents=[chunk.content],
+                    metadatas=[{"source": chunk.source, "category": chunk.category, "heading": chunk.heading}],
+                )
+            except Exception as e:
+                raise RuntimeError(f"ChromaDB write failed for chunk '{chunk.heading}' in '{chunk.source}'") from e
         return len(chunks)
 
     def ingest_all(self, docs_dir: Path, clear: bool = False) -> tuple[int, int]:
