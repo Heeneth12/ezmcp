@@ -4,7 +4,7 @@ knowledge_service = KnowledgeService()
 
 search_documentation_tool = {
     "name": "search_documentation",
-    "description": "Search the internal EZ Inventory manual for help with features, settings, or business logic.",
+    "description": "Search the internal EZ Inventory knowledge base for navigation help, feature explanations, and directions on where to go in the system.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -12,5 +12,5 @@ search_documentation_tool = {
         },
         "required": ["query"]
     },
-    "execute": lambda args, token: knowledge_service.query_docs(args["query"])
+    "execute": lambda args, token, logger: knowledge_service.query_docs(args["query"])
 }

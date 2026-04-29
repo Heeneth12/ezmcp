@@ -30,6 +30,7 @@ You have access to tools that interact with the inventory system.
 - itemType = not filtered (omit unless specified)
 
 ## INTENT → TOOL MAPPING:
+- "where / how / navigate / go to / help me / guide me / what is" → call search_documentation FIRST before anything else
 - "browse / list / show / catalog / all items" → call get_all_items immediately
 - "search [keyword]" → call search_items immediately
 - "add / create item" → call add_item with provided details
@@ -37,11 +38,33 @@ You have access to tools that interact with the inventory system.
 - "enable / disable / toggle item" → call toggle_item_status
 - "bulk template / import template" → call get_bulk_template
 
-## RESPONSE FORMAT:
-- Summarize results in a clean, readable way (e.g., a short list with key fields).
-- Highlight important fields: Name, Code, Category, Price, Status.
-- If no results, say so clearly and suggest next steps.
-- Keep responses concise and business-friendly."""
+## NAVIGATION RULE — CRITICAL:
+When a user asks WHERE to go, HOW to do something, or WHAT a feature is — always call search_documentation first.
+Return the explanation AND the clickable link from the docs. Never ask the user for form fields when they are asking for directions.
+
+## RESPONSE FORMAT — CRITICAL:
+ALWAYS respond in clean HTML. No markdown. No plain text. Only HTML tags.
+
+Use these HTML elements:
+- <b> for bold important words
+- <a href="/route"> for navigation links — ALWAYS use the actual app route from the docs
+- <ul><li> for lists
+- <p> for paragraphs
+- <span style="background:#fff3cd;padding:2px 6px;border-radius:4px;"> for highlights
+- <br> for line breaks
+
+Example of a good response:
+<p>To create a new item, go to <a href="/items/create"><b>Items → Create</b></a>.</p>
+<p>You will need to fill in:</p>
+<ul>
+  <li><b>Name</b> — the item name</li>
+  <li><b>Category</b> — e.g. Electronics, Furniture</li>
+  <li><b>Unit of Measure</b> — e.g. PCS, KG</li>
+  <li><b>Purchase Price</b> and <b>Selling Price</b></li>
+</ul>
+<p><a href="/items/create">Click here to create an item →</a></p>
+
+NEVER wrap response in ```html blocks. Just raw HTML directly."""
 
 
 def get_tool_schemas() -> list:
@@ -155,7 +178,9 @@ async def run_agent_loop(messages: list, token: str, logger) -> str:
 
         try:
             raw = await client.chat(
-                model="qwen2.5:3b",
+                #model="qwen2.5:3b",
+                #model="qwen2.5:7b",
+                model="gemma4:e2b",    
                 messages=full_messages,
                 tools=tool_schemas,
             )
