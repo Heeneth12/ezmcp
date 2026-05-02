@@ -1,5 +1,7 @@
+import os
 import json
 from ollama import AsyncClient as OllamaAsyncClient
+from openai import AsyncOpenAI
 from modules.items.item_tools import ITEM_TOOLS
 from modules.knowledge.knowledge_tools import search_documentation_tool
 
@@ -114,11 +116,11 @@ async def execute_tool(name: str, args: dict, token: str, logger) -> str:
     return result
 
 
-def _normalize_response(raw):
-    """
-    Normalize ollama response — handles both dict and typed object responses.
-    Returns (msg, tool_calls, content)
-    """
+# ==========================================
+# OLLAMA HELPER FUNCTIONS
+# ==========================================
+
+def _normalize_response_ollama(raw):
     if isinstance(raw, dict):
         msg = raw.get("message", {})
         tool_calls = msg.get("tool_calls") or []
@@ -129,12 +131,7 @@ def _normalize_response(raw):
         content = getattr(raw.message, "content", "") or ""
     return msg, tool_calls, content
 
-
-def _normalize_tool_call(tool_call):
-    """
-    Normalize a single tool call — handles both dict and typed object.
-    Returns (name, args)
-    """
+def _normalize_tool_call_ollama(tool_call):
     if isinstance(tool_call, dict):
         fn = tool_call.get("function", {})
         name = fn.get("name")
@@ -144,11 +141,7 @@ def _normalize_tool_call(tool_call):
         args = tool_call.function.arguments
     return name, args
 
-
-def _to_dict_message(msg, content, tool_calls):
-    """
-    Always return a plain dict for appending to message history.
-    """
+def _to_dict_message_ollama(msg, content, tool_calls):
     if isinstance(msg, dict):
         return msg
     return {
@@ -157,12 +150,10 @@ def _to_dict_message(msg, content, tool_calls):
         "tool_calls": tool_calls,
     }
 
-
-async def run_agent_loop(messages: list, token: str, logger) -> str:
+async def _run_ollama_loop(messages: list, token: str, logger) -> str:
     client = OllamaAsyncClient()
     tool_schemas = get_tool_schemas()
 
-    # Prepend system prompt — keeps it separate from user history
     full_messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         *messages,
@@ -178,8 +169,6 @@ async def run_agent_loop(messages: list, token: str, logger) -> str:
 
         try:
             raw = await client.chat(
-                #model="qwen2.5:3b",
-                #model="qwen2.5:7b",
                 model="gemma4:e2b",    
                 messages=full_messages,
                 tools=tool_schemas,
@@ -190,9 +179,9 @@ async def run_agent_loop(messages: list, token: str, logger) -> str:
                 layer="ollama", event="ollama_error",
                 data={"error": str(e)},
             )
-            return "I'm having trouble connecting to the AI model. Please try again shortly."
+            return "I'm having trouble connecting to the local AI model. Please try again shortly."
 
-        msg, tool_calls, content = _normalize_response(raw)
+        msg, tool_calls, content = _normalize_response_ollama(raw)
 
         logger.debug(
             f"Raw response — has_tool_calls={bool(tool_calls)}",
@@ -204,7 +193,6 @@ async def run_agent_loop(messages: list, token: str, logger) -> str:
             },
         )
 
-        # No tool calls — this is the final reply
         if not tool_calls:
             logger.debug(
                 "No tool calls — returning final reply",
@@ -212,12 +200,10 @@ async def run_agent_loop(messages: list, token: str, logger) -> str:
             )
             return content or "I couldn't generate a response. Please try again."
 
-        # Append assistant message to history
-        full_messages.append(_to_dict_message(msg, content, tool_calls))
+        full_messages.append(_to_dict_message_ollama(msg, content, tool_calls))
 
-        # Execute each tool call
         for tool_call in tool_calls:
-            name, args = _normalize_tool_call(tool_call)
+            name, args = _normalize_tool_call_ollama(tool_call)
 
             logger.debug(
                 f"Tool call requested: {name}({json.dumps(dict(args))})",
@@ -241,3 +227,87 @@ async def run_agent_loop(messages: list, token: str, logger) -> str:
         data={"max": MAX_TOOL_ITERATIONS},
     )
     return "I reached the maximum number of steps trying to complete your request. Please try a simpler query."
+
+
+# ==========================================
+# GEMINI (CLOUD) HELPER FUNCTIONS
+# ==========================================
+
+def _normalize_response_gemini(raw):
+    msg = raw.choices[0].message
+    tool_calls = getattr(msg, "tool_calls", None) or []
+    content = getattr(msg, "content", "") or ""
+    return msg, tool_calls, content
+
+def _normalize_tool_call_gemini(tool_call):
+    name = tool_call.function.name
+    args_string = tool_call.function.arguments
+    args = json.loads(args_string) if args_string else {}
+    return name, args
+
+async def _run_gemini_loop(messages: list, token: str, logger) -> str:
+    client = AsyncOpenAI(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+    
+    tool_schemas = get_tool_schemas()
+
+    full_messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        *messages,
+    ]
+
+    for iteration in range(MAX_TOOL_ITERATIONS):
+        logger.section(f"GEMINI ITERATION {iteration + 1}")
+
+        try:
+            raw = await client.chat.completions.create(
+                model="gemini-2.5-flash", 
+                messages=full_messages,
+                tools=tool_schemas,
+            )
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            return "I'm having trouble connecting to the cloud AI model. Please try again shortly."
+
+        msg, tool_calls, content = _normalize_response_gemini(raw)
+
+        if not tool_calls:
+            return content or "I couldn't generate a response. Please try again."
+
+        # Append the assistant message directly (OpenAI SDK handles the object structure)
+        full_messages.append(msg) 
+
+        for tool_call in tool_calls:
+            name, args = _normalize_tool_call_gemini(tool_call)
+            
+            result = await execute_tool(name, args, token, logger)
+            
+            # Gemini strictly requires tool_call_id to map the response
+            full_messages.append({
+                "role": "tool", 
+                "tool_call_id": tool_call.id, 
+                "content": str(result)
+            })
+
+    logger.error("Reached max tool iterations for Gemini")
+    return "I reached the maximum number of steps trying to complete your request."
+
+
+# ==========================================
+# MAIN ROUTER
+# ==========================================
+
+async def run_agent_loop(messages: list, token: str, logger) -> str:
+    """
+    Main entry point. Routes to either Ollama or Gemini based on the LLM_PROVIDER environment variable.
+    """
+    provider = os.environ.get("LLM_PROVIDER", "ollama").lower()
+    
+    if provider == "gemini":
+        logger.debug("Routing request to Gemini Cloud API", layer="router")
+        return await _run_gemini_loop(messages, token, logger)
+    else:
+        logger.debug("Routing request to Local Ollama", layer="router")
+        return await _run_ollama_loop(messages, token, logger)

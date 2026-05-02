@@ -56,10 +56,10 @@ class KnowledgeIngester:
         chunks = self.parse_markdown_text(text, source=filepath.name, category=category)
         for chunk in chunks:
             try:
-                response = self.client.embeddings(model="nomic-embed-text", prompt=chunk.content)
-                vector = response.embedding
+                response = self.client.embed(model="nomic-embed-text", input=chunk.content)
+                vector = response['embeddings'][0]
             except Exception as e:
-                raise RuntimeError("Ollama not running — start it before ingesting") from e
+                raise RuntimeError(f"Ollama embed failed: {e}") from e
             try:
                 self.collection.upsert(
                     ids=[chunk.id],

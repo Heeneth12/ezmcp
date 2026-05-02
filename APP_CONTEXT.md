@@ -14,7 +14,7 @@ const corsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 };
-app.use(cors(corsOptions)); 
+app.use(cors(corsOptions));
 
 const port = process.env.PORT || 8085;
 const devUrl = process.env.SERVER_URL + "/v1/mcp/chat";
@@ -22,7 +22,7 @@ const devUrl = process.env.SERVER_URL + "/v1/mcp/chat";
 // Helper: Fetch History & Map roles to Ollama format
 async function getChatHistory(conversationId: number, token: string) {
     if (!conversationId) return [];
-    
+
     try {
         const response = await axios.get(`${devUrl}/${conversationId}/messages`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -53,7 +53,7 @@ app.post("/v1/ai/generate", async (req, res) => {
     try {
         const { message, conversationId } = req.body;
         const authHeader = req.headers.authorization;
-        
+
         if (!authHeader) return res.status(401).json({ reply: "Unauthorized" });
         const token = authHeader.split(" ")[1];
         if (!message) return res.status(400).json({ reply: "Message required." });
@@ -379,7 +379,6 @@ export const itemTools = [
     }
 ];
 
-
 export interface ItemModel {
     id?: number;
     name: string;
@@ -417,7 +416,7 @@ export interface BulkUploadResponse {
 import axios from "axios";
 
 export const API_CONFIG = {
-    BASE_URL: process.env.SERVER_URL || "http://localhost:8085",
+    BASE_URL: process.env.SERVER_URL || "<http://localhost:8085>",
     TIMEOUT: 5000
 };
 
@@ -665,3 +664,5 @@ public class MCPServiceImpl implements MCPService {
                 .build();
     }
 }
+
+## - > python -m uvicorn main:app --host 0.0.0.0 --port 8086 --reload
